@@ -8,16 +8,16 @@
 
 ## Examples:
     1. Standard Hash Cracking
-    python3 cracker.py hashes.txt wordlist.txt
+         python3 cracker.py hashes.txt wordlist.txt
 
     2. Salted Hash Cracking
-    If your target hash file contains salted hashes formatted like this:
+       If your target hash file contains salted hashes formatted like this:
 
      a8500520a449db840d89b79e69e6566c:salt
 
      Run the script specifying the salt position:
 
-     python3 cracker.py salted_hash.txt wordlist.txt --salt append
+        python3 cracker.py salted_hash.txt wordlist.txt --salt append
 
 ## Disclamer
 
