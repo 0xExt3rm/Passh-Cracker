@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-cracker.py - dictionary-based hash cracker (Project 1, step 2)
+cracker.py - dictionary-based hash cracker with salt support (Project 1, step 4)
 
 Usage:
-    python3 cracker.py <hash_file> <wordlist_file> [-a ALGO]
+    python3 cracker.py <hash_file> <wordlist_file> [-a ALGO] [--salt-position {prepend,append}]
 """
 
 import argparse
@@ -24,7 +24,7 @@ class Color:
 
 BANNER = f"""{Color.CYAN}{Color.BOLD}
 ========================================
-      SIMPLE HASH CRACKER  v0.2
+      SIMPLE HASH CRACKER  v0.3
 ========================================{Color.RESET}"""
 
 KNOWN_LENGTHS = {
@@ -49,26 +49,37 @@ def detect_algorithm(hash_value: str) -> Optional[str]:
     return KNOWN_LENGTHS.get(len(hash_value))
 
 
+def apply_salt(password: str, salt: str, position: str) -> str:
+    """Combine a candidate password with its salt before hashing."""
+    if position == "append":
+        return password + salt
+    return salt + password  # "prepend" (default)
+
+
 def load_targets(path: str, forced_algo: Optional[str]) -> dict:
     """
-    Read target hashes from a file, one per line. Two supported formats:
-        <hash>
-        <label>:<hash>
-    Blank lines and lines starting with # are skipped. Unlabeled hashes
-    are auto-numbered (hash#1, hash#2, ...) by line order.
-    Returns { algorithm: {hash: label} }.
+    Read target hashes from a file, one per line. Supported formats:
+        <hash>                  unsalted, auto-labeled
+        <label>:<hash>          unsalted
+        <label>:<hash>:<salt>   salted (salt itself may contain colons)
+    Blank lines and lines starting with # are skipped. <label> may NOT
+    contain a colon - it's always read as the first field.
+    Returns { (algorithm, salt): {hash: label} }; salt is "" when unsalted.
     """
-    by_algo = {}
+    by_group = {}
     with open(path, "r", encoding="utf-8", errors="ignore") as f:
         for line_number, raw_line in enumerate(f, start=1):
             line = raw_line.strip()
             if not line or line.startswith("#"):
                 continue
 
-            if ":" in line:
-                label, hash_value = line.rsplit(":", 1)
+            parts = line.split(":")
+            if len(parts) == 1:
+                label, hash_value, salt = f"hash#{line_number}", parts[0], ""
             else:
-                label, hash_value = f"hash#{line_number}", line
+                label = parts[0]
+                hash_value = parts[1]
+                salt = ":".join(parts[2:])  # "" if nothing left
 
             hash_value = hash_value.lower()
             algo = forced_algo or detect_algorithm(hash_value)
@@ -79,19 +90,20 @@ def load_targets(path: str, forced_algo: Optional[str]) -> dict:
                       f"(use -a to force one){Color.RESET}", file=sys.stderr)
                 continue
 
-            by_algo.setdefault(algo, {})[hash_value] = label
+            by_group.setdefault((algo, salt), {})[hash_value] = label
 
-    return by_algo
+    return by_group
 
 
-def crack(by_algo: dict, wordlist_path: str):
+def crack(by_group: dict, wordlist_path: str, salt_position: str):
     """
-    One pass over the wordlist. For each candidate word, hash it once per
-    algorithm still needed and check it against all remaining targets of
-    that algorithm. Stops early once nothing is left to find.
+    One pass over the wordlist. For each candidate word, salt it correctly
+    for every (algorithm, salt) group still needed, hash it, and check it
+    against all remaining targets in that group. Stops early once nothing
+    is left to find.
     Returns (found, remaining, attempts, elapsed_seconds, interrupted).
     """
-    remaining = {algo: dict(hashes) for algo, hashes in by_algo.items()}
+    remaining = {key: dict(hashes) for key, hashes in by_group.items()}
     found = []
     attempts = 0
     start = time.time()
@@ -108,18 +120,21 @@ def crack(by_algo: dict, wordlist_path: str):
                     continue
                 attempts += 1
 
-                for algo in list(remaining.keys()):
-                    digest = hash_string(candidate, algo)
-                    bucket = remaining[algo]
+                for key in list(remaining.keys()):
+                    algo, salt = key
+                    salted_candidate = apply_salt(candidate, salt, salt_position)
+                    digest = hash_string(salted_candidate, algo)
+                    bucket = remaining[key]
                     if digest in bucket:
                         label = bucket.pop(digest)
-                        found.append((label, candidate, algo))
+                        found.append((label, candidate, algo, salt))
                         elapsed = time.time() - start
-                        print(f"{Color.GREEN}[+] {label} ({algo}) -> "
+                        salt_note = f", salt='{salt}'" if salt else ""
+                        print(f"{Color.GREEN}[+] {label} ({algo}{salt_note}) -> "
                               f"{candidate}{Color.RESET}  "
                               f"[{attempts} tries, {elapsed:.1f}s]")
                         if not bucket:
-                            del remaining[algo]
+                            del remaining[key]
 
                 if attempts % 200000 == 0:
                     print(f"{Color.YELLOW}[i] {attempts} tried...{Color.RESET}",
@@ -134,7 +149,7 @@ def crack(by_algo: dict, wordlist_path: str):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Simple dictionary-based hash cracker."
+        description="Simple dictionary-based hash cracker with salt support."
     )
     parser.add_argument("hash_file", help="File with target hash(es), one per line")
     parser.add_argument("wordlist", help="Wordlist file of candidate passwords")
@@ -143,27 +158,44 @@ def main():
         choices=sorted(set(KNOWN_LENGTHS.values())),
         help="Force a specific algorithm instead of auto-detecting per hash",
     )
+    parser.add_argument(
+        "--salt-position",
+        choices=["prepend", "append"],
+        default="prepend",
+        help="Where the salt goes relative to the password (default: prepend)",
+    )
     args = parser.parse_args()
 
     print(BANNER)
 
     try:
-        by_algo = load_targets(args.hash_file, args.algo)
+        by_group = load_targets(args.hash_file, args.algo)
     except FileNotFoundError:
         print(f"{Color.RED}[-] Hash file not found: {args.hash_file}{Color.RESET}")
         sys.exit(1)
 
-    total_targets = sum(len(h) for h in by_algo.values())
+    total_targets = sum(len(h) for h in by_group.values())
     if total_targets == 0:
         print(f"{Color.RED}[-] No usable hashes loaded from {args.hash_file}{Color.RESET}")
         sys.exit(1)
 
-    algo_summary = ", ".join(f"{len(h)} {a}" for a, h in by_algo.items())
+    algo_totals = {}
+    salted_count = 0
+    for (algo, salt), hashes in by_group.items():
+        algo_totals[algo] = algo_totals.get(algo, 0) + len(hashes)
+        if salt:
+            salted_count += len(hashes)
+
+    algo_summary = ", ".join(f"{count} {algo}" for algo, count in algo_totals.items())
     print(f"{Color.CYAN}[i] Loaded {total_targets} hash(es): {algo_summary}{Color.RESET}")
+    if salted_count:
+        print(f"{Color.CYAN}[i] {salted_count} salted (position: {args.salt_position}){Color.RESET}")
     print(f"{Color.CYAN}[i] Wordlist: {args.wordlist}{Color.RESET}\n")
 
     try:
-        found, remaining, attempts, elapsed, interrupted = crack(by_algo, args.wordlist)
+        found, remaining, attempts, elapsed, interrupted = crack(
+            by_group, args.wordlist, args.salt_position
+        )
     except FileNotFoundError:
         print(f"{Color.RED}[-] Wordlist not found: {args.wordlist}{Color.RESET}")
         sys.exit(1)
@@ -176,9 +208,10 @@ def main():
 
     if remaining_count:
         print(f"{Color.RED}[-] Not cracked:{Color.RESET}")
-        for algo, hashes in remaining.items():
+        for (algo, salt), hashes in remaining.items():
+            salt_note = f", salt='{salt}'" if salt else ""
             for h, label in hashes.items():
-                print(f"    {label} ({algo}: {h})")
+                print(f"    {label} ({algo}{salt_note}: {h})")
 
     if interrupted:
         sys.exit(130)
