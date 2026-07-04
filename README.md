@@ -1,15 +1,23 @@
 # Passh-Cracker
-just training :]
+> **Project 1, Step ∞** — *Just training :]*
 
-dictionary-based hash cracker (with salt support) (Project 1, step ∞ )
+'dictionary-based hash cracker' (with salt support) (Project 1, step ∞ )
 
-Usage:
+## Usage:
     python3 cracker.py <hash_file> <wordlist_file> [-a ALGO] [--salt position {prepend,append}]
 
-if you have salted hash looks like this
+## Examples:
+    '1. Standard Hash Cracking'
+        python3 cracker.py hashes.txt wordlist.txt
 
- a8500520a449db840d89b79e69e6566c:salt 
+    '2. Salted Hash Cracking'
+        If your target hash file contains salted hashes formatted like this:
 
-you can usage like this
+     a8500520a449db840d89b79e69e6566c:salt
 
- python3 cracker.py salted_hash.txt wordlist.txt
+     Run the script specifying the salt position:
+
+     python3 cracker.py salted_hash.txt wordlist.txt --salt append
+
+## Disclamer:
+    This tool is created strictly for educational purposes and authorized security testing. Do not use it against systems or hashes without explicit permission.
