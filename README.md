@@ -19,6 +19,6 @@
 
      python3 cracker.py salted_hash.txt wordlist.txt --salt append
 
-##Disclamer
+## Disclamer
 
 This tool is created strictly for educational purposes and authorized security testing. Do not use it against systems or hashes without explicit permission.
