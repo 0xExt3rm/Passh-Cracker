@@ -27,8 +27,8 @@ Run the script specifying the salt position:
 
 If your hash file looks like this (salted and standard hashes together):
 
-    alice:a8500520a449db840d89b79e69e6566c:salt
-    bob:1c8bfe8f801d79745c4631d09fff36c82aa37fc4cce4fc946683d7b336b63032
+ `alice:a8500520a449db840d89b79e69e6566c:salt
+ bob:1c8bfe8f801d79745c4631d09fff36c82aa37fc4cce4fc946683d7b336b63032`
 
 Run the script without any extra configuration. It will dynamically parse the labels, auto-detect each algorithm, extract the unique salts, and process everything in a single pass:
 
