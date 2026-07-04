@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+<<<<<<< HEAD
+=======
+"""
+cracker.py - dictionary-based hash cracker with salt support (Project 1, step ∞)
+>>>>>>> f00e4c17e929b8afef136ac6e5621dd4e27a11c8
 
 # -------------------------------------------------------------------------------------------------
 # cracker.py - dictionary-based cracker: hashes and ZIP archives (Project 1, step final)          |
