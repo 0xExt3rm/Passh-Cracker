@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-cracker.py - dictionary-based hash cracker with salt support (Project 1, step 4)
+cracker.py - dictionary-based hash cracker with salt support (Project 1, step ∞)
 
 Usage:
     python3 cracker.py <hash_file> <wordlist_file> [-a ALGO] [--salt-position {prepend,append}]
